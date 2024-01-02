@@ -3,8 +3,6 @@ import click
 import importlib.metadata
 import collections
 
-import cas_eresearch_gitlab_app.files as files
-
 
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
 FLEX_CONTEXT_SETTINGS = dict(
@@ -50,12 +48,7 @@ def cli(ctx: click.core.Context) -> None:
 def create_file(filename: str, n_lines: int) -> None:
     """Create a file"""
 
-    try:
-        files.create_file(filename, n_lines=n_lines)
-    except files.CreateFileError as e:
-        print(e)
-        raise e
-
+    pass
 
 @cli.command(context_settings=CONTEXT_SETTINGS)
 @click.argument("filename", type=click.Path(exists=True))
@@ -69,8 +62,4 @@ def create_file(filename: str, n_lines: int) -> None:
 def process_file(filename: str, inverse: bool) -> None:
     """Process a file"""
 
-    try:
-        files.process_file(filename, inverse=inverse)
-    except files.ProcessFileError as e:
-        print(e)
-        raise e
+    pass
