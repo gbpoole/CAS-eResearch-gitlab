@@ -49,7 +49,7 @@ async def gate_ip_address(request: Request):
                 status.HTTP_403_FORBIDDEN, "Not a valid incoming IP address"
             )
 
-@app.post("/webhook/{webhook_type}", dependencies=[Depends(gate_ip_address)])
+@app.post("/webhook/", dependencies=[Depends(gate_ip_address)])
 async def receive_payload(
     request: Request,
     event_header: str = Header(...),

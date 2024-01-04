@@ -28,6 +28,9 @@ __pycache__
 .cache
 .ropeproject
 
+# Environment files
+.env*
+
 # Virtual env stuff
 venv
 .venv
