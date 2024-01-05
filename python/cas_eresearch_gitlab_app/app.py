@@ -20,6 +20,27 @@ from httpx import AsyncClient
 
 load_dotenv()
 
+import logging.config
+LOGGING_CONFIG = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'app_file': {
+            'level': 'DEBUG',
+            'class': 'logging.FileHandler',
+            'filename': f"{__name__}.log",
+        },
+    },
+    'loggers': {
+        f'{__name__}': {
+            'handlers': ['app_file'],
+            'level': 'INFO',
+            'propagate': False
+        },
+    }
+}
+logging.config.dictConfig(LOGGING_CONFIG)
+
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
