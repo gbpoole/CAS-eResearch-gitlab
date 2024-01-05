@@ -1,4 +1,5 @@
 import ipaddress
+import logging
 import json
 import os
 import subprocess
@@ -19,6 +20,8 @@ from httpx import AsyncClient
 
 load_dotenv()
 
+logger = logging.getLogger(__name__)
+
 app = FastAPI()
 
 # Check if a GATE_IP has been defined in the environment and parse it if so
@@ -29,7 +32,7 @@ if GATE_IP:
         # Make sure to ignore any starting 'https://', etc.
         GATE_IP = ipaddress.ip_address(GATE_IP_IN.split('/')[-1])
     except ValueError:
-        print(f"The GATE_IP (value={GATE_IP_IN}) that has been passed from the environment is invalid.")
+        logger.error(f"The GATE_IP (value={GATE_IP_IN}) that has been passed from the environment is invalid.")
         exit(1)
 
 
@@ -49,10 +52,9 @@ async def gate_ip_address(request: Request):
                 status.HTTP_403_FORBIDDEN, "Not a valid incoming IP address"
             )
 
-@app.post("/webhook/", dependencies=[Depends(gate_ip_address)])
+@app.post("/", dependencies=[Depends(gate_ip_address)])
 async def receive_payload(
     request: Request,
-    event_header: str = Header(...),
 ) -> Dict:
     """Receive wbhook event
 
@@ -64,8 +66,6 @@ async def receive_payload(
     ----------
     request : Request
         Request object
-    event_header : str
-        Event header
 
     Returns
     -------
@@ -74,8 +74,6 @@ async def receive_payload(
     """
     event_payload = await request.json()
 
-    if event_header == "push":
-        return {"message": f"{event_header}", "payload": f"{event_payload}"}
+    logger.info(f"received payload: {event_payload}")
+    return {"message": "Webhook received successfully"}
 
-    else:
-        return {"message": "Unable to process action"}
