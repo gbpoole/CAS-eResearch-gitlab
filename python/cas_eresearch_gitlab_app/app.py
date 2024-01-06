@@ -3,13 +3,12 @@ import logging
 import json
 import os
 import subprocess
+from decouple import config
 from enum import Enum
 from typing import Dict
-
-from dotenv import load_dotenv
 from fastapi import (
     BackgroundTasks,
-    Depends,
+    Depends, 
     FastAPI,
     Header,
     HTTPException,
@@ -18,9 +17,7 @@ from fastapi import (
 )
 from httpx import AsyncClient
 
-load_dotenv()
-
-import logging.config
+# Configure logging
 LOGGING_CONFIG = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -40,13 +37,23 @@ LOGGING_CONFIG = {
     }
 }
 logging.config.dictConfig(LOGGING_CONFIG)
-
 logger = logging.getLogger(__name__)
+logger.info("Logger configured")
+
+
+# Parse environment
+GATE_IP = config('GATE_IP', default = None)
+TOKEN = config('TOKEN', default = None)
+
+if not TOKEN:
+    logger.error("No token specified by environment.")
+    exit(1)
+else:
+    logger.info("Token found")
 
 app = FastAPI()
 
 # Check if a GATE_IP has been defined in the environment and parse it if so
-GATE_IP = os.getenv("GATE_IP", None)
 if GATE_IP:
     GATE_IP_IN = GATE_IP
     try:
@@ -73,7 +80,17 @@ async def gate_ip_address(request: Request):
                 status.HTTP_403_FORBIDDEN, "Not a valid incoming IP address"
             )
 
-@app.post("/", dependencies=[Depends(gate_ip_address)])
+async def check_token(request: Request):
+    try:
+        request_token = request.headers['X-Gitlab-Token']
+    except KeyError:
+        logger.error(f"Received request does not have a 'X-Gitlab-Token' entry in it's header: {request.headers}")
+        raise HTTPException( status.HTTP_401_UNAUTHORIZED, "Token not specified")
+    if request_token != TOKEN:
+        raise HTTPException( status.HTTP_401_UNAUTHORIZED, f"Invalid token ({request_token}).")
+    return
+
+@app.post("/", dependencies=[Depends(gate_ip_address),Depends(check_token)])
 async def receive_payload(
     request: Request,
 ) -> Dict:
