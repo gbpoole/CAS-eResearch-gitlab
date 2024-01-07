@@ -38,8 +38,7 @@ LOGGING_CONFIG = {
 }
 logging.config.dictConfig(LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
-logger.info("Logger configured")
-
+logger.info("========== Initialising service ==========")
 
 # Parse environment
 GATE_IP = config('GATE_IP', default = None)
@@ -49,9 +48,7 @@ if not TOKEN:
     logger.error("No token specified by environment.")
     exit(1)
 else:
-    logger.info("Token found")
-
-app = FastAPI()
+    logger.info("Token configured")
 
 # Check if a GATE_IP has been defined in the environment and parse it if so
 if GATE_IP:
@@ -62,7 +59,9 @@ if GATE_IP:
     except ValueError:
         logger.error(f"The GATE_IP (value={GATE_IP_IN}) that has been passed from the environment is invalid.")
         exit(1)
-
+    logger.info(f"IP gateing configured for {GATE_IP}.")
+else:
+    logger.warning("No IP gateing configured.")
 
 async def gate_ip_address(request: Request):
     # Allow GitHub IPs only
@@ -90,15 +89,16 @@ async def check_token(request: Request):
         raise HTTPException( status.HTTP_401_UNAUTHORIZED, f"Invalid token ({request_token}).")
     return
 
+app = FastAPI()
+
 @app.post("/", dependencies=[Depends(gate_ip_address),Depends(check_token)])
-async def receive_payload(
-    request: Request,
-) -> Dict:
-    """Receive wbhook event
+async def receive_payload( request: Request) -> Dict:
+    """Receive webhook event
 
     You can test this hook with the following:
 
-        curl -X 'POST' 127.0.0.1:8000/webhook/ping -H 'event-header: push' -d '{"test1": 1}'
+      $ uvicorn cas_eresearch_gitlab_app.app:app --reload
+      $ curl -X 'POST' http://127.0.0.1:8000 -H 'X-Gitlab-Token: 123' -d '{"test": 1}'
 
     Parameters
     ----------
@@ -108,10 +108,17 @@ async def receive_payload(
     Returns
     -------
     Dict:
-        Event return report
+        Event status report
     """
-    event_payload = await request.json()
 
+    # Try to obtain the webhook payload
+    try:
+        event_payload = await request.json()
+    except ValueError:
+        raise HTTPException( status.HTTP_400_BAD_REQUEST, "Payload not specified.")
+
+    # Handle valid wenhooks
     logger.info(f"received payload: {event_payload}")
-    return {"message": "Webhook received successfully"}
+    return {"message": "Webhook processed successfully."}
 
+logger.info("========== Initialisation complete ==========")
