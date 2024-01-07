@@ -17,38 +17,28 @@ from fastapi import (
 )
 from httpx import AsyncClient
 
-# Configure logging
-LOGGING_CONFIG = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'handlers': {
-        'app_file': {
-            'level': 'DEBUG',
-            'class': 'logging.FileHandler',
-            'filename': f"{__name__}.log",
-        },
-    },
-    'loggers': {
-        f'{__name__}': {
-            'handlers': ['app_file'],
-            'level': 'INFO',
-            'propagate': False
-        },
-    }
-}
-logging.config.dictConfig(LOGGING_CONFIG)
-logger = logging.getLogger(__name__)
+# Configure logger
+logger = logging.getLogger('API')
+handler = logging.FileHandler(f'{__name__}.log')
+formatter = logging.Formatter(fmt='%(asctime)s | %(name)s | %(levelname)-7s | %(message)s')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+logger.setLevel(logging.INFO)
+
 logger.info("========== Initialising service ==========")
 
-# Parse environment
+# Parse runtime configuration
 GATE_IP = config('GATE_IP', default = None)
 TOKEN = config('TOKEN', default = None)
-
 if not TOKEN:
     logger.error("No token specified by environment.")
     exit(1)
 else:
     logger.info("Token configured")
+
+LOG_LEVEL = config('LOG_LEVEL', default = logging.DEBUG )
+logger.setLevel(LOG_LEVEL)
+logger.info(f"Application logging level set to {logger.level}.")
 
 # Check if a GATE_IP has been defined in the environment and parse it if so
 if GATE_IP:
