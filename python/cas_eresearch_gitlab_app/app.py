@@ -1,4 +1,5 @@
 import ipaddress
+import datetime
 import logging
 import json
 import os
@@ -16,6 +17,11 @@ from fastapi import (
     status,
 )
 from httpx import AsyncClient
+
+from sqlalchemy.orm import Session
+
+from . import crud, models, schemas
+from .database import SessionLocal, engine
 
 package_name = __name__.split('.')[0]
 
@@ -36,7 +42,7 @@ if not TOKEN:
     logger.error("No token specified by environment.")
     exit(1)
 else:
-    logger.info("Token configured")
+    logger.info("Token configured.")
 
 LOG_LEVEL = config('LOG_LEVEL', default = logging.DEBUG )
 logger.setLevel(LOG_LEVEL)
@@ -75,22 +81,31 @@ async def check_token(request: Request):
     try:
         request_token = request.headers['X-Gitlab-Token']
     except KeyError:
-        logger.error(f"Received request does not have a 'X-Gitlab-Token' entry in it's header: {request.headers}")
+        logger.error(f"Received request does not have a 'X-Gitlab-Token' entry in it's header.")
         raise HTTPException( status.HTTP_401_UNAUTHORIZED, "Token not specified")
     if request_token != TOKEN:
-        raise HTTPException( status.HTTP_401_UNAUTHORIZED, f"Invalid token ({request_token}).")
+        raise HTTPException( status.HTTP_401_UNAUTHORIZED, "Invalid token")
     return
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 app = FastAPI()
 
+models.Base.metadata.create_all(bind=engine)
+
 @app.post("/", dependencies=[Depends(gate_ip_address),Depends(check_token)])
-async def receive_payload( request: Request) -> Dict:
+async def create_event( request: Request, db=Depends(get_db)) -> Dict:
     """Receive webhook event
 
     You can test this hook with the following:
 
       $ uvicorn cas_eresearch_gitlab_app.app:app --reload
-      $ curl -X 'POST' http://127.0.0.1:8000 -H 'X-Gitlab-Token: 123' -d '{"test": 1}'
+      $ ./scripts/test_event.sh
 
     Parameters
     ----------
@@ -103,14 +118,24 @@ async def receive_payload( request: Request) -> Dict:
         Event status report
     """
 
-    # Try to obtain the webhook payload
+    # Obtain the webhook payload
     try:
         event_payload = await request.json()
     except ValueError:
         raise HTTPException( status.HTTP_400_BAD_REQUEST, "Payload not specified.")
 
-    # Handle valid wenhooks
-    logger.info(f"received payload: {event_payload}")
-    return {"message": "Webhook processed successfully."}
+    # Set the webhook date & time
+    time = datetime.datetime.now()
+
+    # Create event and write it to the database
+    try:
+        event = crud.create_event(db=db,time=time,payload=event_payload)
+    except models.CreateEventError as e:
+        logger.error(f"Invalid payload: {e}")
+        raise HTTPException( status.HTTP_400_BAD_REQUEST, "Payload invalid.")
+
+    # Report success
+    logger.info(f"Event (id={event.id}) processed successfully.")
+    return {"message": "Webhook processed successfully"}
 
 logger.info("========== Initialisation complete ==========")
