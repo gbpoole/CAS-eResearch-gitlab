@@ -17,6 +17,11 @@ INSTRUCTIONS.template
 .DS_Store
 *.dSYM
 
+# Application outputs
+*.log
+*.db
+*.tsv
+
 # Python stuff
 *.pyc
 *.egg
