@@ -17,10 +17,12 @@ from fastapi import (
 )
 from httpx import AsyncClient
 
+package_name = __name__.split('.')[0]
+
 # Configure logger
-logger = logging.getLogger('API')
-handler = logging.FileHandler(f'{__name__}.log')
-formatter = logging.Formatter(fmt='%(asctime)s | %(name)s | %(levelname)-7s | %(message)s')
+logger = logging.getLogger(f'{package_name}')
+handler = logging.FileHandler(f'{package_name}.log')
+formatter = logging.Formatter(fmt='%(asctime)s | %(levelname)-7s | %(message)s')
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 logger.setLevel(logging.INFO)
@@ -29,7 +31,7 @@ logger.info("========== Initialising service ==========")
 
 # Parse runtime configuration
 GATE_IP = config('GATE_IP', default = None)
-TOKEN = config('TOKEN', default = None)
+TOKEN = config('SECRET_TOKEN', default = None)
 if not TOKEN:
     logger.error("No token specified by environment.")
     exit(1)
@@ -38,7 +40,7 @@ else:
 
 LOG_LEVEL = config('LOG_LEVEL', default = logging.DEBUG )
 logger.setLevel(LOG_LEVEL)
-logger.info(f"Application logging level set to {logger.level}.")
+logger.info(f"Application logging level set to {logging.getLevelName(logger.getEffectiveLevel())}.")
 
 # Check if a GATE_IP has been defined in the environment and parse it if so
 if GATE_IP:
