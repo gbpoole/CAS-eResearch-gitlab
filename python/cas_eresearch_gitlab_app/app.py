@@ -20,7 +20,7 @@ from httpx import AsyncClient
 
 from sqlalchemy.orm import Session
 
-from . import crud, models, schemas
+from . import crud, events, models, schemas
 from .database import SessionLocal, engine
 
 package_name = __name__.split('.')[0]
@@ -105,7 +105,7 @@ async def create_event( request: Request, db=Depends(get_db)) -> Dict:
     You can test this hook with the following:
 
       $ uvicorn cas_eresearch_gitlab_app.app:app --reload
-      $ ./scripts/test_event.sh
+      $ ./scripts/test_post.sh
 
     Parameters
     ----------
@@ -137,5 +137,34 @@ async def create_event( request: Request, db=Depends(get_db)) -> Dict:
     # Report success
     logger.info(f"Event (id={event.id}) processed successfully.")
     return {"message": "Webhook processed successfully"}
+
+
+@app.get("/events", dependencies=[Depends(check_token)])
+async def get_events( request: Request, db=Depends(get_db)) -> str:
+    """Get webhook events
+
+    You can test this hook with the following:
+
+      $ uvicorn cas_eresearch_gitlab_app.app:app --reload
+      $ ./scripts/test_get.sh
+
+    Parameters
+    ----------
+    request : Request
+        Request object
+
+    Returns
+    -------
+    str:
+        String containing a list of filtered events
+    """
+
+    # Read events
+    ds = events.DataSet('./')
+
+    # Report success
+    logger.info(f"{ds.count()} events returned.")
+
+    return ds.to_json()
 
 logger.info("========== Initialisation complete ==========")
