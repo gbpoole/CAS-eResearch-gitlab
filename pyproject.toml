@@ -31,7 +31,8 @@ fastapi = "^0.105.0"
 httpx = "^0.25.2"
 python-decouple = "^3.8"
 sqlalchemy = "^2.0.25"
-pandas = "^2.1.4"
+pandas = "^2.2.0"
+
 
 [tool.poetry.extras]
 docs = [
