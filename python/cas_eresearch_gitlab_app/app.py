@@ -4,7 +4,7 @@ import logging
 import json
 import os
 import subprocess
-from decouple import config
+from decouple import AutoConfig
 from enum import Enum
 from typing import Dict
 from fastapi import (
@@ -34,6 +34,8 @@ logger.addHandler(handler)
 logger.setLevel(logging.INFO)
 
 logger.info("========== Initialising service ==========")
+
+config = AutoConfig(search_path=os.getcwd())
 
 # Parse runtime configuration
 GATE_IP = config('GATE_IP', default = None)

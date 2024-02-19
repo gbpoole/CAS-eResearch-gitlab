@@ -1,11 +1,12 @@
 import json
+import os
 import requests
 import pandas as pd
 from io import StringIO
-from decouple import config
+from decouple import AutoConfig
 from .events import DataSet
 
-# Configure logger
+config = AutoConfig(search_path=os.getcwd())
 
 class Client(object):
     def __init__(self,url="https://cas-eresearch-gitlab.adacs-gpoole.cloud.edu.au",token=None):
