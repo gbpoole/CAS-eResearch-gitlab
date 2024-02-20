@@ -50,6 +50,7 @@ def create_file(filename: str, n_lines: int) -> None:
 
     pass
 
+
 @cli.command(context_settings=CONTEXT_SETTINGS)
 @click.argument("filename", type=click.Path(exists=True))
 @click.option(
