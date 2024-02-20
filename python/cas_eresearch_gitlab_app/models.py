@@ -1,5 +1,4 @@
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, DateTime, JSON
-from sqlalchemy.orm import relationship
+from sqlalchemy import Column, Integer, DateTime, JSON
 
 from .database import Base
 
@@ -17,4 +16,3 @@ class Event(Base):
     time = Column(DateTime, index=True)
     dev_id = Column(Integer, index=True)
     payload = Column(JSON)
-
