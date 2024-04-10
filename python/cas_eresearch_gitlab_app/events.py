@@ -218,9 +218,7 @@ class DataSet(object):
                                 user["name"],
                                 f"{project['namespace']}/{project['name']}",
                                 timedelta_to_hours(delta),
-                                metadata["title"]
-                                .replace('"', '\\"')
-                                .replace("'", "\\'"),
+                                metadata["title"],
                             ]
                         )
 
@@ -247,6 +245,11 @@ class DataSet(object):
         self.dates = sorted(self.time_t.index)
 
     def subselect(self, queries: Dict):
+        def reformat_string(string_to_escape, reverse=False):
+            if reverse:
+                return string_to_escape.replace('\\"', '"').replace("\\'", "'")
+            else:
+                return string_to_escape.replace('"', '\\"').replace("'", "\\'")
 
         query_string = None
         for query in queries.keys():
@@ -254,7 +257,9 @@ class DataSet(object):
                 query_string = ""
             else:
                 query_string = query_string + " & "
-            query_string = query_string + f'`{query}` == "{queries[query]}"'
+            query_string = (
+                query_string + f'`{query}` == "{reformat_string(queries[query])}"'
+            )
 
         return DataSet(df=self.df.query(query_string))
 
@@ -280,7 +285,15 @@ class DataSet(object):
         else:
             print("Empty dataset.")
 
-    def print_totals(self, levels=["dev", "project", "issue"], _i_level=0):
+    def print_totals(
+        self,
+        levels=["dev", "project", "issue"],
+        sort_levels=["project", "dev"],
+        _i_level=0,
+    ):
+        level = levels[0]
+        groups = self.group(level).reorder(column="time", ascending=False)
+
         def time_to_string(time: int) -> str:
             weeks = time / 40.0
             if weeks < 1:
@@ -288,9 +301,13 @@ class DataSet(object):
             else:
                 return f"{time/40.:.1f}w"
 
-        level = levels[0]
-        groups = self.group(level).reorder(column="time", ascending=False)
-        for group in groups._group_names:
+        # Sort order of printing?
+        group_names = groups._group_names.values
+        if level in sort_levels:
+            group_names = sorted(group_names, key=str.casefold)
+
+        # Print lines
+        for group in group_names:
             ds_group = self.subselect({f"{level}": group})
 
             time = 0
@@ -300,7 +317,7 @@ class DataSet(object):
             print(f"{4*_i_level*' '}{group}: {time_to_string(time)}")
             if len(levels) > 1:
                 self.subselect({f"{level}": group}).print_totals(
-                    levels[1:], _i_level + 1
+                    levels[1:], sort_levels, _i_level + 1
                 )
 
         if _i_level == 1:
