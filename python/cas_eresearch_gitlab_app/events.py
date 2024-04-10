@@ -6,6 +6,7 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
+from typing import Dict
 from dateutil.relativedelta import relativedelta
 from pandas.api.types import is_list_like
 from pathlib import Path
@@ -204,10 +205,10 @@ class DataSet(object):
                     user = payload["user"]
                     project = payload["project"]
                     changes = payload["changes"]
-                    payload["object_attributes"]
+                    metadata = payload["object_attributes"]
 
                     if "total_time_spent" in changes.keys():
-                        # print(json.dumps(payload,indent=2))
+                        # print(json.dumps(payload,sort_keys=True,indent=4))
                         t_1 = changes["total_time_spent"]["previous"]
                         t_2 = changes["total_time_spent"]["current"]
                         delta = timedelta(seconds=(t_2 - t_1))
@@ -215,13 +216,14 @@ class DataSet(object):
                             [
                                 event_time,
                                 user["name"],
-                                project["name"],
+                                f"{project['namespace']}/{project['name']}",
                                 timedelta_to_hours(delta),
+                                metadata["title"],
                             ]
                         )
 
                 df = pd.DataFrame(
-                    event_list, columns=["date", "dev", "project", "time"]
+                    event_list, columns=["date", "dev", "project", "time", "issue"]
                 )
 
                 df["month"] = df["date"].apply(lambda row: f"{row:%Y-%m}")
@@ -242,22 +244,23 @@ class DataSet(object):
         )["time"].sum()
         self.dates = sorted(self.time_t.index)
 
-    def subselect(self, month=None, project=None, dev=None):
+    def subselect(self, queries: Dict):
+        def reformat_string(string_to_escape, reverse=False):
+            if reverse:
+                return string_to_escape.replace('\\"', '"').replace("\\'", "'")
+            else:
+                return string_to_escape.replace('"', '\\"').replace("'", "\\'")
+
         query_string = None
-        if month:
-            query_string = f"month == '{month}'"
-        if project:
+        for query in queries.keys():
             if not query_string:
                 query_string = ""
             else:
                 query_string = query_string + " & "
-            query_string = query_string + f"project == '{project}'"
-        if dev:
-            if not query_string:
-                query_string = ""
-            else:
-                query_string = query_string + " & "
-            query_string = query_string + f"dev == '{dev}'"
+            query_string = (
+                query_string + f'`{query}` == "{reformat_string(queries[query])}"'
+            )
+
         return DataSet(df=self.df.query(query_string))
 
     def group(self, columns):
@@ -266,17 +269,69 @@ class DataSet(object):
     def count(self):
         return len(self.df)
 
-    def print(self, columns=["project", "dev", "time"], sort=None):
+    def print_list(self, columns=["project", "dev", "time"], sort=None, tail=None):
         if self.count() > 0:
             if sort:
-                print(self.df.sort_values(by=sort).to_string(columns=columns))
+                str_out = self.df.sort_values(by=sort).to_string(columns=columns)
             else:
-                print(self.df.to_string(columns=columns))
+                str_out = self.df.to_string(columns=columns)
+            if tail and tail > 0:
+                str_out = "\n".join(str_out.splitlines()[-tail:])
+                print(f"Printing last {tail} entries:")
+            print(str_out)
             sum_time = self.df["time"].sum()
             print()
             print(f"total time = {sum_time:.1f}h")
         else:
             print("Empty dataset.")
+
+    def print_totals(
+        self,
+        levels=["dev", "project", "issue"],
+        sort_levels=["project", "dev"],
+        _i_level=0,
+    ):
+        level = levels[0]
+        groups = self.group(level).reorder(column="time", ascending=False)
+
+        def time_to_string(time: int) -> str:
+            weeks = time / 40.0
+            if weeks < 1:
+                return f"{time}h"
+            else:
+                return f"{time/40.:.1f}w"
+
+        # Sort order of printing?
+        group_names = groups._group_names.values
+        if level in sort_levels:
+            group_names = sorted(group_names, key=str.casefold)
+
+        # Print lines
+        for group in group_names:
+            ds_group = self.subselect({f"{level}": group})
+
+            time = 0
+            for _, row in ds_group.df.iterrows():
+                time = time + row["time"]
+
+            print(f"{4*_i_level*' '}{group}: {time_to_string(time)}")
+            if len(levels) > 1:
+                self.subselect({f"{level}": group}).print_totals(
+                    levels[1:], sort_levels, _i_level + 1
+                )
+
+        if _i_level == 1:
+            print()
+
+    def print_summary(self, tail=20):
+        # Print all records
+        self.print_list(tail=tail)
+
+        print("=== Devs ===\n")
+        self.print_totals(["dev", "project", "issue"])
+
+        print("=== Projects ===\n")
+        self.print_totals(["project", "dev", "issue"])
 
     def to_json(self):
         return self.df.to_json()
@@ -286,12 +341,13 @@ class DataSet(object):
         n_plot_prj = min(n, len(prjs._group_names))
         prjs.plot(n=n_plot_prj, title="Projects")
         for i_prj, prj_name in enumerate(prjs._group_names[0:n_plot_prj]):
-            ds_prj = self.subselect(project=prj_name)
+            ds_prj = self.subselect({"project": prj_name})
             devs = ds_prj.group("dev").reorder(column=column, ascending=False)
             n_plot_dev = min(n, len(devs._group_names))
             devs.plot(n=n_plot_dev, title=f"{prj_name}")
+        devs = self.group("dev").reorder(column=column, ascending=False)
         for i_dev, dev_name in enumerate(devs._group_names[0:n_plot_dev]):
-            ds_dev = self.subselect(dev=dev_name)
-            devs = ds_dev.group("project").reorder(column=column, ascending=False)
-            n_plot_dev = min(n, len(devs._group_names))
-            devs.plot(n=n_plot_dev, title=f"{dev_name}")
+            ds_dev = self.subselect({"dev": dev_name})
+            prj = ds_dev.group("project").reorder(column=column, ascending=False)
+            n_plot_dev = min(n, len(prj._group_names))
+            prj.plot(n=n_plot_dev, title=f"{dev_name}")
